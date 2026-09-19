@@ -285,44 +285,64 @@ passive 组行程比 active 还大，正是因为尾巴没有被弹簧夹住、�
 └── .gitignore                # 忽略清单（见 8.1）
 ```
 
-### 8.1 git 忽略规则
+### 8.1 git 忽略规则与实际上传状态
 
-`机器恐龙/.gitignore` 的原则是：**源码 / 配置 / 模型 / 报告 / 界面 /
-"实际生成的检查点"要上传；虚拟环境、缓存、中间检查点、本地迭代历史不上传。**
+`机器恐龙/.gitignore` 挡住的是：**虚拟环境、Python/运行期缓存、系统与编辑器垃圾**。
+仓库 `Robo-T-Rex` 的实际状态（`git ls-files` 实测）：
 
-实测（`scripts/check_gitignore.py`）：整棵树只会上传 **140 个文件 / 18.99 MB**。
+> **285 个文件 / 119.50 MB**（1 个提交 `5e5ae06`，分支 `main`）
 
-| 分类 | 内容 | 上传 |
-|---|---|---|
-| 虚拟环境 | `.venv/`（850 MB / 2.6 万文件） | ❌ |
-| 缓存 | `__pycache__/`、`.mplcache/`、`.uv-cache/`、`.dsh-tmp/`、`*.log` | ❌ |
-| 中间检查点 | `runs/*/checkpoints/`（约 28 MB，每 8–12 万步一个） | ❌ 可由训练复现 |
-| 迭代历史 | `runs_archive/**/*.zip`、`runs_archive/*/tb/`（约 73 MB） | ❌ 只留 `train_meta.json` / `metrics.json` |
-| 系统垃圾 | `Thumbs.db`、`.DS_Store`、`Desktop.ini`、编辑器目录 | ❌ |
-| 源码与文档 | `trex/` `scripts/` `web/` `app.py` `run.ps1` `*.md` `config.json` `requirements.txt` | ✅ |
-| 模型 | `models/*.xml`、`models/*_inertia.json` | ✅ |
-| **交付检查点** | `runs/*/{selected,best,final}_model.zip` | ✅ |
-| 训练记录 | `runs/*/train_meta.json`、`metrics.json`、`tb/`（界面要读） | ✅ |
-| 评估与对照 | `evaluations/**` | ✅ |
-| 画面导出 | `preview/**`（PNG + MP4） | ✅ |
+也就是说**中间检查点与迭代历史也一并上传了** —— 这是刻意的选择：
+这样在查看器里可以把 `ckpt_80000 → … → 1000000` 逐段回放，
+完整看到"从原地踏步到跑起来"的过程（阶段三第 5→6 轮的对比直接可视化）。
 
-改完 `.gitignore` 一定要用验证脚本过一遍：
+| 分类 | 内容 | 上传 | 实测体积 |
+|---|---|---|---|
+| 虚拟环境 | `.venv/` | ❌ | 850 MB / 2.6 万文件 |
+| 缓存 | `__pycache__/`、`.mplcache/`、`.uv-cache/`、`.dsh-tmp/`、`*.log` | ❌ | 812 MB（`.uv-cache`，在工作区根） |
+| 系统垃圾 | `Thumbs.db`、`.DS_Store`、`Desktop.ini`、`.vscode/`、`.idea/` | ❌ | — |
+| 源码与文档 | `trex/` `scripts/` `web/` `app.py` `run.ps1` `*.md` `config.json` `requirements.txt` `.gitignore` | ✅ | 0.3 MB |
+| 模型 | `models/*.xml`、`models/*_inertia.json` | ✅ | 0.05 MB |
+| 交付检查点 | `runs/*/{selected,best,final}_model.zip` | ✅ | 8.6 MB |
+| 训练记录 | `runs/*/train_meta.json`、`metrics.json`、`tb/`（界面画曲线要读） | ✅ | 0.8 MB |
+| 评估与对照 | `evaluations/**` | ✅ | 1.28 MB |
+| 画面导出 | `preview/**`（PNG + MP4） | ✅ | 7.64 MB |
+| **中间检查点** | `runs/*/checkpoints/`（116 个） | ✅ 已上传 | 28 MB |
+| **迭代历史** | `runs_archive/**`（阶段三 4 轮 / 阶段四 5 轮） | ✅ 已上传 | 72.88 MB |
+
+**想瘦身到 ~19 MB**（只留交付必需的检查点，去掉中间检查点与归档）：
+把 `.gitignore` 第 51–54 行行首的 `#` 删掉让那 4 条规则生效，然后重做这个初始提交：
+
+```powershell
+notepad .gitignore          # 删掉第 51-54 行行首的 #（那 4 条 runs/... 规则）
+git update-ref -d HEAD      # 撤销这次提交，文件一个都不动
+git add -A
+git commit -m "机器霸王龙: MuJoCo 物理仿真 + PPO 四阶段训练达标 + 尾巴对照实验"
+git ls-files | Measure-Object | Select-Object -ExpandProperty Count   # 应为 ~140
+git push -u origin main --force-with-lease    # 远端已有旧提交，需要覆盖
+```
+
+**改完 `.gitignore` 一定要用验证脚本过一遍**：
 
 ```powershell
 & $py scripts\check_gitignore.py            # 假树断言 + 真实项目"会上传什么"报告
 & $py scripts\check_gitignore.py --no-real  # 只跑假树断言
 ```
 
-它在临时目录里搭一棵同名假树建 git 仓库做断言（该挡的挡住、该传的没被误挡），
+脚本会**自己读 `.gitignore` 判断当前策略**：那 4 条规则生效时就断言"检查点必须被忽略"，
+被注释掉时就断言"检查点必须被上传"，两种状态都能验证，不会误报。
+它在临时目录里搭一棵同名假树建 git 仓库做断言，
 然后对真实项目做一次 `git add -A -n` 干跑并打印体积分布，
 **不会在你的项目里留下 `.git`**。
-> 这个脚本第一次跑就抓到了一个真 bug：`.gitignore` 里**行尾**写的 `#` 注释
+
+> 这个脚本抓到过一个真 bug：`.gitignore` 里**行尾**写的 `#` 注释
 > 不是注释而是模式的一部分，导致 `.mplcache/`、`.dsh-tmp/` 两条规则完全失效。
+> —— **只有行首的 `#` 才是注释**，写规则时别在行尾加说明。
 
 > 另外工作区根目录 `E:\ai_daima\DeepSeek_Harness\.gitignore` 只做一件事：
 > 挡住根目录的 `.uv-cache/`（实测 **812 MB**）与 `.dsh-tmp/`。
 > 如果你不从根目录建仓库，删掉它没有任何影响。**注意根目录下还有十几个别的项目**，
-> 所以 git 仓库建议建在 `机器恐龙/` 里面，而不是工作区根。
+> 所以 git 仓库建在 `机器恐龙/` 里面是对的，不要建在工作区根。
 
 ---
 
