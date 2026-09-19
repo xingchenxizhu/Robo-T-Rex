@@ -1,0 +1,54 @@
+{
+  "task": "stand",
+  "mode": "active",
+  "steps": 800000,
+  "envs": 8,
+  "seed": 0,
+  "n_steps": 1024,
+  "batch_size": 512,
+  "lr": 0.0003,
+  "ent_coef": 0.0,
+  "net_arch": [
+    128,
+    128
+  ],
+  "gamma": 0.99,
+  "log_std_init": -2.3,
+  "curriculum": [
+    [
+      0.0,
+      {
+        "perturb": false,
+        "push_scale": 0.0
+      }
+    ],
+    [
+      0.25,
+      {
+        "perturb": true,
+        "push_scale": 0.45
+      }
+    ],
+    [
+      0.5,
+      {
+        "perturb": true,
+        "push_scale": 0.75
+      }
+    ],
+    [
+      0.75,
+      {
+        "perturb": true,
+        "push_scale": 1.0
+      }
+    ]
+  ],
+  "init_from": null,
+  "obs_dim": 74,
+  "act_dim": 12,
+  "started": "2026-09-18 17:52:16",
+  "finished": "2026-09-18 18:17:35",
+  "wall_seconds": 1519.117841720581,
+  "steps_per_second": 526.6214233215147
+}

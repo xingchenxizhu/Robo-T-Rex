@@ -1,0 +1,54 @@
+{
+  "task": "reach",
+  "mode": "active",
+  "steps": 800000,
+  "envs": 8,
+  "seed": 0,
+  "n_steps": 1024,
+  "batch_size": 512,
+  "lr": 0.0003,
+  "ent_coef": 0.0,
+  "net_arch": [
+    128,
+    128
+  ],
+  "gamma": 0.995,
+  "log_std_init": -2.0,
+  "curriculum": [
+    [
+      0.0,
+      {
+        "curriculum": 0,
+        "target_randomize": 0.0
+      }
+    ],
+    [
+      0.25,
+      {
+        "curriculum": 0,
+        "target_randomize": 0.03
+      }
+    ],
+    [
+      0.55,
+      {
+        "curriculum": 0,
+        "target_randomize": 0.06
+      }
+    ],
+    [
+      0.8,
+      {
+        "curriculum": 0,
+        "target_randomize": 0.1
+      }
+    ]
+  ],
+  "init_from": "runs\\s1_stand\\final_model.zip",
+  "obs_dim": 74,
+  "act_dim": 12,
+  "started": "2026-09-18 18:59:21",
+  "finished": "2026-09-18 19:26:07",
+  "wall_seconds": 1606.5115327835083,
+  "steps_per_second": 497.97339370100065
+}

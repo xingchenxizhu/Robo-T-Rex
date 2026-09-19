@@ -1,0 +1,56 @@
+{
+  "task": "loco",
+  "mode": "active",
+  "steps": 700000,
+  "envs": 8,
+  "seed": 0,
+  "n_steps": 1024,
+  "batch_size": 512,
+  "lr": 0.0003,
+  "ent_coef": 0.0,
+  "net_arch": [
+    128,
+    128
+  ],
+  "gamma": 0.995,
+  "log_std_init": -1.7,
+  "curriculum": [
+    [
+      0.0,
+      {
+        "speed_scale": 0.55
+      }
+    ],
+    [
+      0.2,
+      {
+        "speed_scale": 0.7
+      }
+    ],
+    [
+      0.45,
+      {
+        "speed_scale": 0.85
+      }
+    ],
+    [
+      0.7,
+      {
+        "speed_scale": 0.95
+      }
+    ],
+    [
+      0.9,
+      {
+        "speed_scale": 1.0
+      }
+    ]
+  ],
+  "init_from": "runs/_s3_loco_v1/best_model",
+  "obs_dim": 98,
+  "act_dim": 20,
+  "started": "2026-09-18 19:54:40",
+  "finished": "2026-09-18 20:18:27",
+  "wall_seconds": 1426.6339452266693,
+  "steps_per_second": 490.6654593086815
+}

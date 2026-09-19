@@ -1,0 +1,50 @@
+{
+  "task": "chase",
+  "mode": "active",
+  "steps": 500000,
+  "envs": 8,
+  "seed": 0,
+  "n_steps": 1024,
+  "batch_size": 512,
+  "lr": 0.0003,
+  "ent_coef": 0.0,
+  "net_arch": [
+    128,
+    128
+  ],
+  "gamma": 0.995,
+  "log_std_init": -0.9,
+  "curriculum": [
+    [
+      0.0,
+      {
+        "curriculum": 0
+      }
+    ],
+    [
+      0.25,
+      {
+        "curriculum": 1
+      }
+    ],
+    [
+      0.5,
+      {
+        "curriculum": 2
+      }
+    ],
+    [
+      0.75,
+      {
+        "curriculum": 3
+      }
+    ]
+  ],
+  "init_from": "runs/s3_loco/selected_model",
+  "obs_dim": 100,
+  "act_dim": 20,
+  "started": "2026-09-19 00:29:00",
+  "finished": "2026-09-19 00:43:53",
+  "wall_seconds": 892.9052505493164,
+  "steps_per_second": 559.9698284811287
+}

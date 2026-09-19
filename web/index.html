@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"/>
+<title>机器霸王龙 · 尾巴协同仿真查看器</title>
+<style>
+  :root{
+    --bg:#0e1116; --panel:#161b22; --panel2:#1c2230; --line:#2a3140;
+    --fg:#dfe6f0; --dim:#8b97a8; --accent:#3ea37a; --warn:#d08a2c; --bad:#c05252;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);
+       font-family:"Segoe UI","Microsoft YaHei",system-ui,sans-serif;font-size:13px}
+  header{padding:10px 16px;border-bottom:1px solid var(--line);display:flex;
+         align-items:center;gap:14px;background:var(--panel)}
+  header h1{font-size:15px;margin:0;font-weight:600;letter-spacing:.5px}
+  header .tag{color:var(--dim);font-size:12px}
+  .layout{display:grid;grid-template-columns:250px 1fr 320px;gap:10px;padding:10px;
+          height:calc(100vh - 47px)}
+  .col{display:flex;flex-direction:column;gap:10px;min-height:0;overflow:auto}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:10px}
+  .panel h2{font-size:12px;margin:0 0 8px;color:var(--dim);text-transform:uppercase;
+            letter-spacing:.8px;font-weight:600}
+  label{display:block;color:var(--dim);margin:7px 0 3px;font-size:12px}
+  select,input[type=number]{width:100%;background:var(--panel2);color:var(--fg);
+    border:1px solid var(--line);border-radius:5px;padding:5px 6px;font-size:12px}
+  .row{display:flex;gap:6px;flex-wrap:wrap}
+  button{flex:1;min-width:62px;background:var(--panel2);color:var(--fg);border:1px solid var(--line);
+         border-radius:5px;padding:6px 8px;cursor:pointer;font-size:12px}
+  button:hover{border-color:var(--accent)}
+  button.on{background:var(--accent);border-color:var(--accent);color:#07130d;font-weight:600}
+  .seg{display:flex;gap:4px}
+  .seg button{flex:1}
+  input[type=range]{width:100%}
+  #view{background:#000;border:1px solid var(--line);border-radius:8px;overflow:hidden;
+        position:relative;flex:1;min-height:0;display:flex;align-items:center;justify-content:center}
+  #view img{width:100%;height:100%;object-fit:contain;display:block}
+  #hud{position:absolute;left:10px;top:10px;background:rgba(10,14,20,.72);
+       border:1px solid var(--line);border-radius:6px;padding:7px 9px;font-size:12px;
+       font-variant-numeric:tabular-nums;pointer-events:none;line-height:1.55}
+  .kv{display:flex;justify-content:space-between;gap:12px}
+  .kv b{font-weight:600;color:#fff}
+  canvas{width:100%;display:block}
+  .tailrow{display:flex;align-items:center;gap:6px;margin:3px 0;font-size:11px;color:var(--dim)}
+  .bar{flex:1;height:9px;background:var(--panel2);border-radius:3px;position:relative;overflow:hidden}
+  .bar i{position:absolute;top:0;bottom:0;left:50%;background:var(--accent)}
+  .bar .zero{position:absolute;left:50%;top:0;bottom:0;width:1px;background:#4a5568}
+  .foot{display:inline-block;width:13px;height:13px;border-radius:3px;background:#2a3140;
+        border:1px solid var(--line);vertical-align:-2px;margin-right:4px}
+  .foot.on{background:var(--accent);border-color:var(--accent)}
+  .legend{color:var(--dim);font-size:11px;margin-top:6px}
+  .err{color:var(--bad)}
+  .pill{display:inline-block;padding:1px 7px;border-radius:9px;background:var(--panel2);
+        border:1px solid var(--line);font-size:11px;color:var(--dim);margin-right:4px}
+</style>
+</head>
+<body>
+<header>
+  <h1>机器霸王龙 · 尾巴协同仿真查看器</h1>
+  <span class="tag">MuJoCo + PPO ｜ 同一策略下切换尾巴驱动方式（active / passive / fixed）做对照</span>
+  <span id="status" class="tag" style="margin-left:auto"></span>
+</header>
+
+<div class="layout">
+  <!-- 左栏 -->
+  <div class="col">
+    <div class="panel">
+      <h2>实验与检查点</h2>
+      <label>实验目录 (runs/)</label>
+      <select id="run"></select>
+      <label>检查点</label>
+      <select id="ckpt"></select>
+      <div class="row" style="margin-top:8px">
+        <button id="load">加载</button>
+      </div>
+      <div class="legend" id="runinfo"></div>
+    </div>
+
+    <div class="panel">
+      <h2>任务</h2>
+      <div class="seg" id="taskseg">
+        <button data-v="stand">站立</button>
+        <button data-v="reach">前探</button>
+        <button data-v="loco">奔跑</button>
+        <button data-v="chase">追逐</button>
+      </div>
+      <h2 style="margin-top:10px">尾巴对照</h2>
+      <div class="seg" id="modeseg">
+        <button data-v="active">主动</button>
+        <button data-v="passive">被动</button>
+        <button data-v="fixed">刚性</button>
+      </div>
+      <label><input type="checkbox" id="perturb"/> 叠加外力扰动（阶段一）</label>
+      <label>课程等级 <span id="curlv">0</span></label>
+      <input type="range" id="curriculum" min="0" max="6" step="1" value="0"/>
+    </div>
+
+    <div class="panel">
+      <h2>播放</h2>
+      <div class="row">
+        <button id="play">▶ 播放</button>
+        <button id="step">单步</button>
+        <button id="reset">重置</button>
+      </div>
+      <label>速度 <span id="speedv">1.00x</span></label>
+      <input type="range" id="speed" min="5" max="200" step="5" value="100"/>
+      <div class="legend">无检查点时为零动作基线，可看纯物理形态差异。</div>
+    </div>
+  </div>
+
+  <!-- 中栏 -->
+  <div class="col">
+    <div id="view">
+      <img id="screen" alt="仿真画面"/>
+      <div id="hud"></div>
+    </div>
+    <div class="panel">
+      <h2>训练进度</h2>
+      <div class="seg" id="tbtabs" style="margin-bottom:8px">
+        <button data-t="rollout/ep_rew_mean">回合奖励</button>
+        <button data-t="trex/success_rate">成功率</button>
+        <button data-t="trex/com_sway">质心晃动</button>
+        <button data-t="trex/tail_rom_mean">尾巴行程</button>
+        <button data-t="trex/tail_momentum_share">尾巴角动量占比</button>
+        <button data-t="trex/fall_rate">跌倒率</button>
+      </div>
+      <canvas id="chart" height="150"></canvas>
+      <div class="legend">曲线来自该实验的 TensorBoard 事件（每 25 个回合一个点）。</div>
+    </div>
+  </div>
+
+  <!-- 右栏 -->
+  <div class="col">
+    <div class="panel">
+      <h2>身体状态</h2>
+      <div id="body"></div>
+    </div>
+    <div class="panel">
+      <h2>尾巴关节（目标角 - 实际角）</h2>
+      <div id="tail"></div>
+      <div class="legend">杆越长表示该关节偏离中立位越多；左=负，右=正。</div>
+    </div>
+    <div class="panel">
+      <h2>接触与目标</h2>
+      <div id="world"></div>
+    </div>
+    <div class="panel">
+      <h2>对照实验文件</h2>
+      <div id="compares" class="legend">暂无</div>
+    </div>
+  </div>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+const state = {sid:null, play:false, speed:1.0, task:'stand', mode:'active',
+               perturb:false, curriculum:0, chartTag:'rollout/ep_rew_mean',
+               runs:[], last:null, busy:false};
+
+function setStatus(t, err){ const e=$('#status'); e.textContent=t; e.className='tag'+(err?' err':''); }
+
+async function api(path, opts){ const r=await fetch(path, opts); return await r.json(); }
+
+/* ---------------- 实验列表 ---------------- */
+async function loadRuns(){
+  const d = await api('/api/runs');
+  state.runs = d.runs || [];
+  const sel = $('#run'); sel.innerHTML='';
+  const opt0 = document.createElement('option');
+  opt0.value=''; opt0.textContent='(无策略 · 纯物理基线)';
+  sel.appendChild(opt0);
+  for(const r of state.runs){
+    const o=document.createElement('option'); o.value=r.name;
+    o.textContent = `${r.name}  [${r.task||'?'}/${r.mode||'?'}]`;
+    sel.appendChild(o);
+  }
+  const first = state.runs.find(r=>r.checkpoints.length);
+  if(first) sel.value = first.name;
+  fillCkpts();
+}
+function currentRun(){ return state.runs.find(r=>r.name===$('#run').value); }
+function fillCkpts(){
+  const r = currentRun(); const sel=$('#ckpt'); sel.innerHTML='';
+  const list = r ? r.checkpoints : [];
+  if(!list.length){ const o=document.createElement('option'); o.value=''; o.textContent='(无检查点)'; sel.appendChild(o); }
+  for(const c of list){ const o=document.createElement('option'); o.value=c; o.textContent=c; sel.appendChild(o); }
+  const best = list.findIndex(c=>c.includes('best_model'));
+  if(best>=0) sel.value = list[best];
+  $('#runinfo').innerHTML = r
+    ? `任务=${r.task} 模式=${r.mode}<br>训练步数=${r.steps??'?'}　最佳窗口成功率=${r.best_score??'—'}<br>回合数=${r.episodes??'?'}`
+    : '未选择实验：将使用零动作基线。';
+  // 加载该实验时自动对齐任务
+  if(r && r.task && ['stand','reach','loco','chase'].includes(r.task)){
+    state.task = r.task; markSeg('#taskseg', state.task);
+  }
+  refreshChart();
+}
+
+/* ---------------- 会话 ---------------- */
+async function newSession(){
+  const r = currentRun();
+  const ck = $('#ckpt').value;
+  // 观测维度随任务变化：任务与检查点不匹配时不能用该策略，退回零动作基线
+  let checkpoint = null;
+  if(r && ck){
+    if(r.task && r.task !== state.task){
+      setStatus(`注意：${r.name} 是「${r.task}」阶段的检查点，与当前任务「${state.task}」观测维度不同，已改用零动作基线。`);
+      checkpoint = null;
+    } else {
+      checkpoint = `runs/${r.name}/${ck}`;
+    }
+  }
+  setStatus(checkpoint ? '正在加载模型…' : '正在创建零动作基线会话…');
+  const d = await api('/api/session', {method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({checkpoint, task:state.task, mode:state.mode,
+      perturb:state.perturb, curriculum:state.curriculum})});
+  if(d.error){ setStatus('加载失败: '+d.error, true); return; }
+  state.sid = d.sid;
+  setStatus(`已加载 ｜ ${state.task} / ${state.mode} ｜ obs=${d.state.obs_dim} ｜ 策略=${d.state.has_policy?(checkpoint||''):'无(零动作)'}`);
+  renderState(d.state);
+}
+
+async function resetSession(){
+  if(!state.sid) return newSession();
+  const d = await api('/api/reset?sid='+state.sid, {method:'POST'});
+  if(d.state) renderState(d.state);
+}
+
+/* ---------------- 帧循环 ---------------- */
+async function tick(){
+  if(state.sid && !state.busy){
+    state.busy = true;
+    try{
+      const d = await api(`/api/frame?sid=${state.sid}&play=${state.play?1:0}&speed=${state.speed}`);
+      if(d.error){
+        // 服务端同一时刻只保留一个会话；若被别的页面/脚本替换掉，
+        // 这里自动重建会话，而不是让画面变黑。
+        setStatus('会话已失效，正在自动重建…');
+        state.sid = null;
+        await newSession();
+      } else {
+        $('#screen').src = 'data:image/jpeg;base64,'+d.frame;
+        renderState(d.state);
+      }
+    }catch(e){ setStatus('连接中断，重试中…', true); }
+    finally{ state.busy=false; }
+  }
+  setTimeout(tick, state.play ? 33 : 120);
+}
+
+/* ---------------- 状态渲染 ---------------- */
+const f = (v,n=2)=> (v===null||v===undefined||isNaN(v)) ? '—' : Number(v).toFixed(n);
+function renderState(s){
+  state.last = s;
+  $('#hud').innerHTML =
+    `<div class="kv"><span>任务 / 阶段</span><b>${s.task} · ${s.phase}</b></div>`+
+    `<div class="kv"><span>时间</span><b>${f(s.time)} s</b></div>`+
+    `<div class="kv"><span>速度 / 步态</span><b>${f(s.speed)} m/s · ${s.gait}</b></div>`+
+    `<div class="kv"><span>高度</span><b>${f(s.height,3)} m</b></div>`+
+    `<div class="kv"><span>俯仰 / 横滚</span><b>${f(s.pitch,3)} / ${f(s.roll,3)}</b></div>`;
+  $('#body').innerHTML =
+    `<div class="kv"><span>朝向我们</span><b>yaw ${f(s.yaw,3)}</b></div>`+
+    `<div class="kv"><span>角速度 (wx,wy,wz)</span><b>${s.vel.slice(0,3).map(v=>f(v,2)).join(', ')}</b></div>`+
+    `<div class="kv"><span>线速度 (vx,vy,vz)</span><b>${s.vel.slice(3,6).map(v=>f(v,2)).join(', ')}</b></div>`+
+    `<div class="kv"><span>质心</span><b>${s.com.map(v=>f(v,2)).join(', ')}</b></div>`+
+    `<div class="kv"><span>下颌开度</span><b>${f(s.jaw,3)} rad</b></div>`+
+    `<div class="kv"><span>跌倒</span><b>${s.fallen?'是':'否'}</b></div>`+
+    `<div class="kv"><span>本回合累计奖励</span><b>${f(s.ep_return,1)}</b></div>`+
+    `<div class="kv"><span>已完成回合</span><b>${s.episodes}</b></div>`;
+  const modes=['active','passive','fixed'];
+  $('#tail').innerHTML = s.tail_q.map((q,i)=>{
+    const pct = Math.max(-50, Math.min(50, q/Math.PI*180/45*50));
+    const w = Math.abs(pct);
+    const left = pct<0 ? 50-w : 50;
+    const name = (i < s.tail_q.length/2) ? `pitch${i}` : `yaw${i-Math.floor(s.tail_q.length/2)}`;
+    return `<div class="tailrow"><span style="width:46px">${name}</span>`+
+           `<div class="bar"><div class="zero"></div><i style="left:${left}%;width:${w}%"></i></div>`+
+           `<span style="width:52px;text-align:right">${(q*180/Math.PI).toFixed(1)}°</span></div>`;
+  }).join('');
+  const fl = s.foot[0]>0, fr = s.foot[1]>0;
+  $('#world').innerHTML =
+    `<div><span class="foot ${fl?'on':''}"></span>左脚接触　`+
+    `<span class="foot ${fr?'on':''}"></span>右脚接触</div>`+
+    `<div class="kv" style="margin-top:6px"><span>接触点数</span><b>${s.contacts.length}</b></div>`+
+    `<div class="kv"><span>目标 / 猎物位置</span><b>${s.prey.map(v=>f(v,2)).join(', ')}</b></div>`+
+    `<div class="legend">接触点坐标：${s.contacts.slice(0,4).map(c=>'('+c.map(v=>f(v,2)).join(',')+')').join(' ')||'—'}</div>`;
+}
+
+/* ---------------- 图表 ---------------- */
+async function refreshChart(){
+  const r = currentRun();
+  if(!r){ $('#chart').getContext('2d').clearRect(0,0,9999,9999); return; }
+  const d = await api('/api/tb?run='+encodeURIComponent(r.name));
+  drawChart(d.series || {});
+}
+function drawChart(series){
+  const c = $('#chart'); const dpr = window.devicePixelRatio||1;
+  const w = c.clientWidth, h = 150;
+  c.width = w*dpr; c.height = h*dpr;
+  const g = c.getContext('2d'); g.setTransform(dpr,0,0,dpr,0,0);
+  g.clearRect(0,0,w,h);
+  const tag = state.chartTag;
+  const pts = series[tag];
+  g.strokeStyle='#2a3140'; g.lineWidth=1;
+  for(let i=1;i<4;i++){ g.beginPath(); g.moveTo(30, h*i/4); g.lineTo(w-6, h*i/4); g.stroke(); }
+  if(!pts || !pts.length){
+    g.fillStyle='#8b97a8'; g.font='12px sans-serif';
+    g.fillText('暂无数据（'+tag+'）', 40, h/2);
+    return;
+  }
+  const xs=pts.map(p=>p[0]), ys=pts.map(p=>p[1]);
+  const x0=Math.min(...xs), x1=Math.max(...xs);
+  let y0=Math.min(...ys), y1=Math.max(...ys);
+  if(y1-y0<1e-6){ y1=y0+1; }
+  const pad=(y1-y0)*0.08; y0-=pad; y1+=pad;
+  const X=v=>30+(w-38)*(x1===x0?0:(v-x0)/(x1-x0));
+  const Y=v=>h-14-(h-26)*(v-y0)/(y1-y0);
+  g.strokeStyle='#3ea37a'; g.lineWidth=1.6; g.beginPath();
+  pts.forEach((p,i)=>{ const x=X(p[0]),y=Y(p[1]); i?g.lineTo(x,y):g.moveTo(x,y); });
+  g.stroke();
+  g.fillStyle='#8b97a8'; g.font='10px sans-serif';
+  g.fillText(y1.toFixed(3), 2, 12); g.fillText(y0.toFixed(3), 2, h-16);
+  g.fillText(String(x0), 30, h-2); g.fillText(String(x1), w-40, h-2);
+  g.fillStyle='#dfe6f0'; g.font='11px sans-serif'; g.fillText(tag, 34, 12);
+}
+
+async function refreshCompares(){
+  const d = await api('/api/compare');
+  const list = d.comparisons || [];
+  $('#compares').innerHTML = list.length
+    ? list.map(c=>`<div style="margin-bottom:6px"><b>${c.task}</b> · <span class="pill">${c.path}</span></div>`).join('')
+    : '暂无（运行 scripts/compare.py 后出现）';
+}
+
+/* ---------------- 交互 ---------------- */
+function markSeg(sel, val){
+  document.querySelectorAll(sel+' button').forEach(b=>b.classList.toggle('on', b.dataset.v===val));
+}
+document.querySelectorAll('#taskseg button').forEach(b=>b.onclick=()=>{
+  state.task=b.dataset.v; markSeg('#taskseg', state.task); newSession(); });
+document.querySelectorAll('#modeseg button').forEach(b=>b.onclick=()=>{
+  state.mode=b.dataset.v; markSeg('#modeseg', state.mode); newSession(); });
+document.querySelectorAll('#tbtabs button').forEach(b=>b.onclick=()=>{
+  state.chartTag=b.dataset.t;
+  document.querySelectorAll('#tbtabs button').forEach(x=>x.classList.toggle('on', x===b));
+  refreshChart(); });
+$('#run').onchange = ()=>{ fillCkpts(); newSession(); };
+$('#ckpt').onchange = ()=> newSession();
+$('#load').onclick = ()=> newSession();
+$('#perturb').onchange = e=>{ state.perturb=e.target.checked; newSession(); };
+$('#curriculum').oninput = e=>{ state.curriculum=+e.target.value; $('#curlv').textContent=state.curriculum; };
+$('#curriculum').onchange = ()=> newSession();
+$('#speed').oninput = e=>{ state.speed=+e.target.value/100; $('#speedv').textContent=state.speed.toFixed(2)+'x'; };
+$('#play').onclick = e=>{ state.play=!state.play; e.target.textContent = state.play?'⏸ 暂停':'▶ 播放';
+                          e.target.classList.toggle('on', state.play); };
+$('#step').onclick = async ()=>{ if(!state.sid) return;
+  const d = await api(`/api/frame?sid=${state.sid}&play=1&speed=0.05`);
+  if(d.frame){ $('#screen').src='data:image/jpeg;base64,'+d.frame; renderState(d.state); } };
+$('#reset').onclick = resetSession;
+window.addEventListener('resize', ()=>refreshChart());
+
+/* ---------------- 启动 ---------------- */
+(async function(){
+  markSeg('#taskseg', state.task); markSeg('#modeseg', state.mode);
+  document.querySelector('#tbtabs button').classList.add('on');
+  await loadRuns();
+  await newSession();
+  await refreshCompares();
+  tick();
+})();
+</script>
+</body>
+</html>

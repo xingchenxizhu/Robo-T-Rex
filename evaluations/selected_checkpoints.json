@@ -1,0 +1,6 @@
+{
+  "stand": "runs\\s1_stand\\selected_model.zip",
+  "reach": "runs\\s2_reach\\selected_model.zip",
+  "loco": "runs\\s3_loco\\selected_model.zip",
+  "chase": "runs\\s4_chase\\selected_model.zip"
+}

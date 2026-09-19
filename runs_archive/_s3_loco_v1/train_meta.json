@@ -1,0 +1,53 @@
+{
+  "task": "loco",
+  "mode": "active",
+  "steps": 1200000,
+  "envs": 8,
+  "seed": 0,
+  "n_steps": 1024,
+  "batch_size": 512,
+  "lr": 0.0003,
+  "ent_coef": 0.0,
+  "net_arch": [
+    128,
+    128
+  ],
+  "gamma": 0.995,
+  "log_std_init": -1.7,
+  "curriculum": [
+    [
+      0.0,
+      {
+        "speed_scale": 0.35
+      }
+    ],
+    [
+      0.2,
+      {
+        "speed_scale": 0.55
+      }
+    ],
+    [
+      0.42,
+      {
+        "speed_scale": 0.75
+      }
+    ],
+    [
+      0.65,
+      {
+        "speed_scale": 0.9
+      }
+    ],
+    [
+      0.85,
+      {
+        "speed_scale": 1.0
+      }
+    ]
+  ],
+  "init_from": "runs\\s2_reach\\final_model.zip",
+  "obs_dim": 98,
+  "act_dim": 20,
+  "started": "2026-09-18 19:28:50"
+}
