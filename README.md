@@ -310,17 +310,28 @@ passive 组行程比 active 还大，正是因为尾巴没有被弹簧夹住、�
 | **中间检查点** | `runs/*/checkpoints/`（116 个） | ✅ 已上传 | 28 MB |
 | **迭代历史** | `runs_archive/**`（阶段三 4 轮 / 阶段四 5 轮） | ✅ 已上传 | 72.88 MB |
 
-**想瘦身到 ~19 MB**（只留交付必需的检查点，去掉中间检查点与归档）：
-把 `.gitignore` 第 51–54 行行首的 `#` 删掉让那 4 条规则生效，然后重做这个初始提交：
+**想瘦身到 ~19 MB**（去掉中间检查点与归档）—— 注意**删文件不等于减小仓库**，
+因为文件已经进了提交历史，两种做法代价不同：
 
 ```powershell
-notepad .gitignore          # 删掉第 51-54 行行首的 #（那 4 条 runs/... 规则）
-git update-ref -d HEAD      # 撤销这次提交，文件一个都不动
-git add -A
-git commit -m "机器霸王龙: MuJoCo 物理仿真 + PPO 四阶段训练达标 + 尾巴对照实验"
-git ls-files | Measure-Object | Select-Object -ExpandProperty Count   # 应为 ~140
-git push -u origin main --force-with-lease    # 远端已有旧提交，需要覆盖
+# 方案 A：从"之后的提交"里去掉（简单、不动历史）
+#   远端 HEAD 变干净，但历史提交里仍有这些文件，
+#   所以 git clone 的下载体积不会明显变小。
+notepad .gitignore                      # 删掉第 51-54 行行首的 #，让 4 条规则生效
+git rm -r --cached runs/*/checkpoints runs_archive
+git commit -m "停止跟踪中间检查点与迭代历史"
+git push
+
+# 方案 B：彻底重写历史（真正把体积降下来，需要 force push）
+pip install git-filter-repo
+git filter-repo --invert-paths --path-glob "*checkpoints/*" --path runs_archive
+git push --force-with-lease
 ```
+
+仓库规模参考：现在 `119.50 MB`，其中 `runs_archive/` 72.88 MB、
+中间检查点约 28 MB。**就本项目而言 119 MB 完全在 GitHub 的正常范围内**
+（单文件硬上限 100 MB，最大的文件只有 0.98 MB），不瘦身也没有实际问题；
+上面的步骤留给以后需要时用。
 
 **改完 `.gitignore` 一定要用验证脚本过一遍**：
 
