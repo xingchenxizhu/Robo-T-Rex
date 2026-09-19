@@ -472,3 +472,9 @@ $env:PYTHONPATH = "E:\ai_daima\DeepSeek_Harness\机器恐龙"
 
 - MuJoCo 3.13 文档：<https://mujoco.readthedocs.io/>
 - Stable-Baselines3 PPO：<https://stable-baselines3.readthedocs.io/>
+
+
+
+## 11、截图
+
+![image-20260919092621793](img/image-20260919092621793.png)
